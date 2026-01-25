@@ -63,7 +63,7 @@ html, body {
   color:black;
   background-color: rgb(253, 180, 180);
   border: 2.5px solid rgb(217, 24, 24);
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 15px;
   font-family: 'Calibri';
   text-decoration: none;
@@ -95,6 +95,19 @@ html, body {
   border-bottom: 2px solid rgb(0, 0, 0);
 }
 
+.rollup-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 50%;
+  height: 100%;
+  gap: 1rem;
+  min-width: 0; 
+
+  margin: 0px 0px 0px 0px;
+  /* padding: 0px 0px 0px 0px; */
+}
 .rollup-box-tl {
   display: flex;
   flex-direction: column;
@@ -217,8 +230,37 @@ html, body {
 
   /* width: 20%; */
   /* height: 100%;  */
-  margin: 10px 0px 35px 0px;
+  margin: 0px 0px 0px 0px;
+  padding: 0px 0px 10px 0px;
+}
+.circle-box-1 {
+  display: flex; 
+  flex-direction: column;
+  justify-content: center; 
+  align-items: center;
+    box-sizing: border-box;
+
+  /* width: 20%; */
+  /* height: 100%;  */
+  margin: 0px 0px 25px 0px;
   padding: 0px 0px 0px 0px;
+}
+
+.circle {
+  display: flex; 
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+
+  margin: 0px 0px 0px 0px;
+  padding: 12px 10px 12px 10px;
+  /* padding: 22px 5px 22px 5px; */
+
+  border: 15px solid rgb(217, 24, 24);
+  border-radius: 100px;
+  background-color: rgb(234, 128, 128);
+  width: 100%; /* Adjust width to ensure it fills the parent */
+  height: auto; /* Adjust height if needed */
 }
 
 .circle-1 {
@@ -228,7 +270,8 @@ html, body {
   text-align: center;
 
   margin: 0px 0px 0px 0px;
-  padding: 22px 5px 22px 5px;
+  padding: 10px 10px 10px 10px;
+  /* padding: 22px 5px 22px 5px; */
 
   border: 15px solid rgb(217, 24, 24);
   border-radius: 100px;
@@ -244,7 +287,7 @@ html, body {
   text-align: center;
 
   margin: 0px 0px 0px 0px;
-   padding: 22px 5px 22px 5px;
+   padding: 0px 8px 0px 8px;
 
   border: 15px solid rgb(217, 24, 24);
   border-radius: 100px;
@@ -292,11 +335,11 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 4rem;
+  gap: 1rem;
 
   width: 100%;
   height: auto;
-  margin: 60px 0px 0px 0px;
+  margin: 0px 0px 0px 0px;
   padding: 0px 0px 0px 0px;
 }
 
@@ -317,12 +360,25 @@ html, body {
 
 .graph-row {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+
+  width: 98%;
+  height: auto;
+  margin: 0px 0px 0px 0px;
+  padding: 0px 0px 0px 0px;
+}
+
+.graph-row-1 {
+  display: flex;
   flex-direction: row;
   justify-content: center;
   align-items: center;
-  gap: 2%;
+  gap: 2rem;
 
-  width: 98%;
+  width: 100%;
   height: auto;
   margin: 0px 0px 0px 0px;
   padding: 0px 0px 0px 0px;
@@ -334,8 +390,8 @@ html, body {
   justify-content: center;
   align-items: center;
 
-  width: 47%;
-  height: 100%;
+  width: 46.6%;
+  height: 70vh;
   margin: 0px 0px 0px 0px;
   padding: 0px 0px 0px 0px;
 }
@@ -344,7 +400,7 @@ html, body {
   margin: 0px 0px 0px 0px;
   padding: 10px 15px 0px 10px;
   width: 100%;
-  height: 60vh;
+  height: 100%;
 
   border: 2px solid rgb(0, 0, 0);
   border-radius: 5px;
@@ -361,7 +417,7 @@ html, body {
 
   width: 95%;
   /* height: auto; */
-  height: 80vh;
+  height: 70vh;
   margin: 0px 0px 0px 0px;
   padding: 0px 0px 0px 0px;
 }
@@ -518,6 +574,7 @@ html, body {
   .graph-box,
   .wide-box,
   .databox,
+  .rollup-box,
   .rollup-box-tl,
   .rollup-box-tr,
   .rollup-box-bl,
