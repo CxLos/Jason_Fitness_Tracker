@@ -31,6 +31,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 report_month = datetime(2026, 1, 1).strftime("%B")
 report_year = datetime(2026, 1, 1).strftime("%Y")
+name = 'Jason'
 
 # Define the Google Sheets URL
 sheet_url = "https://docs.google.com/spreadsheets/d/1EXDabqzS1Gd1AteSqcovvUuJxrUMQvisf_MhnhFMeNk/edit?gid=0#gid=0"
@@ -3191,6 +3192,55 @@ if __name__ == '__main__':
     app.run(debug=
                    True)
                 #    False)
+
+# ============================== Save to Excel ========================== #
+
+# updated_path = f'data/{name}_fitness_tracker_cleaned.xlsx'
+# data_path = os.path.join(script_dir, updated_path)
+# # sheet_name=f'{report_month} {report_year}'
+
+# # Create Excel writer object
+# with pd.ExcelWriter(data_path, engine='openpyxl') as writer:
+#     # Save All Time data
+#     df_long.to_excel(writer, sheet_name='All Time', index=False)
+    
+#     # Dynamically get all available years from Google Sheets
+#     all_worksheets = sheet.worksheets()
+#     all_years = [ws.title for ws in all_worksheets if ws.title not in ['All Time']]
+    
+#     # Save individual years
+#     for year in all_years:
+#         try:
+#             # Load data for each year
+#             df_year = load_data_for_year(year)
+            
+#             # Get all date columns
+#             date_columns = [col for col in df_year.columns if col not in ['Category', 'Exercise']]
+            
+#             # Reshape from wide to long format
+#             df_year_long = df_year.melt(
+#                 id_vars=['Category', 'Exercise'],
+#                 value_vars=date_columns,
+#                 var_name='Date',
+#                 value_name='Weight'
+#             )
+            
+#             # Clean the data
+#             df_year_long['Date'] = pd.to_datetime(df_year_long['Date'], errors='coerce', format='mixed')
+#             df_year_long['Weight'] = pd.to_numeric(df_year_long['Weight'], errors='coerce')
+#             df_year_long = df_year_long.dropna(subset=['Date', 'Weight'])
+#             df_year_long['Category'] = df_year_long['Category'].astype(str).str.strip()
+#             df_year_long['Exercise'] = df_year_long['Exercise'].astype(str).str.strip()
+#             df_year_long = df_year_long.drop_duplicates(subset=['Category', 'Exercise', 'Date'], keep='first')
+#             df_year_long = df_year_long.sort_values('Date').reset_index(drop=True)
+            
+#             # Save to Excel sheet
+#             df_year_long.to_excel(writer, sheet_name=year, index=False)
+#             print(f"Saved {year} data to Excel")
+#         except Exception as e:
+#             print(f"Could not save {year}: {e}")
+
+# print(f"Saved all data to {data_path}")
 
 # -------------------------------------------- KILL PORT ---------------------------------------------------
 
