@@ -516,6 +516,142 @@ html.Div(
     ]
 ),
 
+html.Div(
+    className='rollup-row',
+    children=[
+        
+        html.Div(
+            className='rollup-box-tl',
+            children=[
+                html.Div(
+                    className='title-box',
+                    children=[
+                        html.H3(
+                            id='arm-days-title',
+                            className='rollup-title',
+                            children=[f'Total Arm Days All Time']
+                        ),
+                    ]
+                ),
+
+                html.Div(
+                    className='circle-box',
+                    children=[
+                        html.Div(
+                            className='circle-1',
+                            children=[
+                                html.H1(
+                                    id='arm-days',
+                                className='rollup-number',
+                                children=['-']
+                            ),
+                            ]
+                        )
+                    ],
+                ),
+            ]
+        ),
+        html.Div(
+            className='rollup-box-tr',
+            children=[
+                html.Div(
+                    className='title-box',
+                    children=[
+                        html.H3(
+                            id='ab-days-title',
+                            className='rollup-title',
+                            children=['Total Ab Days All Time']
+                        ),
+                    ]
+                ),
+                html.Div(
+                    className='circle-box',
+                    children=[
+                        html.Div(
+                            className='circle-2',
+                            children=[
+                                html.H1(
+                                id='ab-days',
+                                className='rollup-number',
+                                children=['-']
+                            ),
+                            ]
+                        )
+                    ],
+                ),
+            ]
+        ),
+    ]
+),
+
+html.Div(
+    className='rollup-row',
+    children=[
+        
+        html.Div(
+            className='rollup-box-tl',
+            children=[
+                html.Div(
+                    className='title-box',
+                    children=[
+                        html.H3(
+                            id='other-days-title',
+                            className='rollup-title',
+                            children=[f'Total Other Workouts All Time']
+                        ),
+                    ]
+                ),
+
+                html.Div(
+                    className='circle-box',
+                    children=[
+                        html.Div(
+                            className='circle-1',
+                            children=[
+                                html.H1(
+                                    id='other-days',
+                                className='rollup-number',
+                                children=['-']
+                            ),
+                            ]
+                        )
+                    ],
+                ),
+            ]
+        ),
+        html.Div(
+            className='rollup-box-tr',
+            children=[
+                html.Div(
+                    className='title-box',
+                    children=[
+                        html.H3(
+                            id='-days-title',
+                            className='rollup-title',
+                            children=['Placeholder']
+                        ),
+                    ]
+                ),
+                html.Div(
+                    className='circle-box',
+                    children=[
+                        html.Div(
+                            className='circle-2',
+                            children=[
+                                html.H1(
+                                id='-days',
+                                className='rollup-number',
+                                children=['-']
+                            ),
+                            ]
+                        )
+                    ],
+                ),
+            ]
+        ),
+    ]
+),
+
 # ============================ Visuals ========================== #
 
 html.Div(
@@ -748,6 +884,12 @@ html.Div(
         Output('pull-days', 'children'),
         Output('leg-days-title', 'children'),
         Output('leg-days', 'children'),
+        Output('arm-days-title', 'children'),
+        Output('arm-days', 'children'),
+        Output('ab-days-title', 'children'),
+        Output('ab-days', 'children'),
+        Output('other-days-title', 'children'),
+        Output('other-days', 'children'),
         Output('push-graph', 'figure'),
         Output('pull-graph', 'figure'),
         Output('leg-graph', 'figure'),
@@ -820,6 +962,18 @@ def update_dashboard(selected_year):
     leg_days = df_leg['Date'].nunique() if not df_leg.empty else 0
     leg_fig = make_line_chart(df_leg, f'Leg Progress Over Time - {selected_year}')
     
+    # Calculate arm days (Bicep, Tricep, Forearm)
+    df_arm = df_long[df_long['Category'].isin(['Bicep', 'Tricep', 'Forearm'])].reset_index(drop=True)
+    arm_days = df_arm['Date'].nunique() if not df_arm.empty else 0
+    
+    # Calculate ab days
+    df_ab_calc = df_long[df_long['Category'] == 'Ab'].reset_index(drop=True)
+    ab_days = df_ab_calc['Date'].nunique() if not df_ab_calc.empty else 0
+    
+    # Calculate other workout days
+    df_other_calc = df_long[df_long['Category'] == 'Other'].reset_index(drop=True)
+    other_days = df_other_calc['Date'].nunique() if not df_other_calc.empty else 0
+    
     df_bicep = df_long[df_long['Category'] == 'Bicep'].reset_index(drop=True)
     bicep_fig = make_line_chart(df_bicep, f'Bicep Progress Over Time - {selected_year}')
     
@@ -851,6 +1005,9 @@ def update_dashboard(selected_year):
     push_title = f'Total Push Days {selected_year}'
     pull_title = f'Total Pull Days {selected_year}'
     leg_title = f'Total Leg Days {selected_year}'
+    arm_title = f'Total Arm Days {selected_year}'
+    other_title = f'Total Other Workouts {selected_year}'
+    ab_title = f'Total Ab Days {selected_year}'
     year_subtitle = selected_year
     
     return (
@@ -863,6 +1020,12 @@ def update_dashboard(selected_year):
         pull_days,
         leg_title,
         leg_days,
+        arm_title,
+        arm_days,
+        ab_title,
+        ab_days,
+        other_title,
+        other_days,
         push_fig,
         pull_fig,
         leg_fig,
