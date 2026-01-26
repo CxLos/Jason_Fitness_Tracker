@@ -31,7 +31,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 report_month = datetime(2026, 1, 1).strftime("%B")
 report_year = datetime(2026, 1, 1).strftime("%Y")
-name = 'Jason'
+name = "Jason"
 
 # Define the Google Sheets URL
 sheet_url = "https://docs.google.com/spreadsheets/d/1EXDabqzS1Gd1AteSqcovvUuJxrUMQvisf_MhnhFMeNk/edit?gid=0#gid=0"
@@ -68,31 +68,40 @@ sheet = client.open_by_url(sheet_url)
 
 def load_data_for_year(year):
     """Load and process fitness data for a specific year or all years"""
-    if year == 'All Time':
-        # Load and combine all years
-        all_years = ['2024', '2025', '2026']
-        dfs = []
-        for yr in all_years:
-            try:
-                worksheet = sheet.worksheet(f"Jason_{yr}")
-                data = pd.DataFrame(worksheet.get_all_records())
-                dfs.append(data)
-            except:
-                # Skip if worksheet doesn't exist
-                print(f"Worksheet {yr} not found, skipping...")
-                continue
+    try:
+        # print(f"📊 Loading data for year: {year}")
         
-        if dfs:
-            # Combine all dataframes
-            combined_df = pd.concat(dfs, ignore_index=True)
-            return combined_df.copy()
+        if year == 'All Time':
+            all_years = ['2024', '2025', '2026']
+            dfs = []
+            for yr in all_years:
+                try:
+                    worksheet = sheet.worksheet(f"{name}_{yr}")
+                    data = pd.DataFrame(worksheet.get_all_records())
+                    # print(f"✅ Loaded {len(data)} rows for {yr}")
+                    dfs.append(data)
+                except Exception as e:
+                    print(f"⚠️ Worksheet {name}_{yr} not found: {str(e)}")
+                    continue
+            
+            if dfs:
+                combined_df = pd.concat(dfs, ignore_index=True)
+                # print(f"✅ Combined total: {len(combined_df)} rows")
+                return combined_df.copy()
+            else:
+                print("❌ No data found for All Time")
+                return pd.DataFrame()
         else:
-            # Return empty dataframe if no data found
-            return pd.DataFrame()
-    else:
-        worksheet = sheet.worksheet(f"{year}")
-        data = pd.DataFrame(worksheet.get_all_records())
-        return data.copy()
+            worksheet = sheet.worksheet(f"{name}_{year}")
+            data = pd.DataFrame(worksheet.get_all_records())
+            # print(f"✅ Loaded {len(data)} rows for {year}")
+            return data.copy()
+            
+    except Exception as e:
+        print(f"❌ ERROR loading data for {year}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
 
 # Load default year (All Time)
 df = load_data_for_year('All Time')
@@ -126,19 +135,8 @@ columns =  [
 
 # ============================== Data Preprocessing ========================== #
 
-# Check for duplicate columns
-# duplicate_columns = df.columns[df.columns.duplicated()].tolist()
-# print(f"Duplicate columns found: {duplicate_columns}")
-# if duplicate_columns:
-#     print(f"Duplicate columns found: {duplicate_columns}")
-
 # Get all date columns (everything except Category and Exercise)
 date_columns = [col for col in df.columns if col not in ['Category', 'Exercise']]
-
-# Debug: See what columns are being melted
-# print("All columns in df:", df.columns.tolist())
-# print(f"\nDate columns to melt: {date_columns}")
-# print(f"\nFirst few rows of df:", df.head())
 
 # Reshape from wide to long format
 df_long = df.melt(
@@ -148,9 +146,8 @@ df_long = df.melt(
     value_name='Weight'     # New column name for cell values
 )
 
-# Filter out invalid date strings before converting
 # Remove rows where Date contains common non-date values
-df_long = df_long[~df_long['Date'].astype(str).str.contains('Int\.|Unnamed|#', case=False, na=False)]
+# df_long = df_long[~df_long['Date'].astype(str).str.contains(r'Int\.|Unnamed|#', case=False, na=False)]
 
 # Convert Date to datetime with format specification
 df_long['Date'] = pd.to_datetime(df_long['Date'], errors='coerce', format='mixed')
@@ -185,9 +182,7 @@ df_long['Exercise'] = df_long['Exercise'].astype('object')
 df_long['Date'] = pd.to_datetime(df_long['Date'])
 df_long['Weight'] = df_long['Weight'].astype('float64')
 
-print("Melted DataFrame: \n", df_long.head(10))
-# print("\nDataFrame dtypes:\n", df_long.dtypes)
-# print("\nUnique exercises:\n", df_long['Exercise'].unique())
+# print("Melted DataFrame: \n", df_long.head(10))
 
 # Helper to build line charts without relying on Plotly Express grouping
 def make_line_chart(df_cat: pd.DataFrame, title: str) -> go.Figure:
@@ -229,909 +224,15 @@ def make_line_chart(df_cat: pd.DataFrame, title: str) -> go.Figure:
 
     return fig
 
-# =========================== Total Exercises =========================== #
+# =========================== Initial Empty Figures =========================== #
 
-total_gym_days = len(df)
-# print("Total events:", total_exercises)
-
-# ========================= Push Exercises =========================== #
-
-# Filter for Push category and create explicit copy
-df_push = df_long[df_long['Category'] == 'Push'].reset_index(drop=True)
-# df_push = df_push.reset_index(drop=True)
-# print("DF Push: \n", df_push.head())
-
-df_push["Exercise"] = (
-    df_push["Exercise"]
-    .astype(str)
-    .str.strip()
-)
-
-df_push = df_push.dropna(subset=["Exercise", "Date", "Weight"])
-
-# print(f"\nPush exercises found: {len(df_push)}")
-# print(f"Push exercise names: {df_push['Exercise'].unique()}")
-push_line = make_line_chart(df_push, 'Push Progress Over Time')
-
-# Create push pie chart data
-df_push_counts = df_push['Exercise'].value_counts().reset_index()
-df_push_counts.columns = ['Exercise', 'Count']
-
-push_bar = px.bar(
-    df_push_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Push Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",  # Vertical legend
-        x=1.05,  # Position legend to the right
-        y=1,  # Position legend at the top
-        xanchor="left",  # Anchor legend to the left
-        yanchor="top",  # Anchor legend to the top
-        visible=False,
-        # visible=True,
-    ),
-    hovermode='closest', # Display only one hover label per trace
-    bargap=0.08,  # Reduce the space between bars
-    bargroupgap=0,  # Reduce space between individual bars in groups
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-push_pie = px.pie(
-    df_push_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Push Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    # textinfo='value+percent',
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Pull Exercises =========================== #
-
-# Filter for Pull category and reset index
-df_pull = df_long[df_long['Category'] == 'Pull'].reset_index(drop=True)
-
-pull_line = make_line_chart(df_pull, 'Pull Progress Over Time')
-
-# Create pull pie chart data
-df_pull_counts = df_pull['Exercise'].value_counts().reset_index()
-df_pull_counts.columns = ['Exercise', 'Count']
-
-pull_bar = px.bar(
-    df_pull_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Pull Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-pull_pie = px.pie(
-    df_pull_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Pull Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Leg Exercises =========================== #
-
-# Filter for Leg category and reset index
-df_leg = df_long[df_long['Category'] == 'Leg'].reset_index(drop=True)
-
-leg_line = make_line_chart(df_leg, 'Leg Progress Over Time')
-
-# Create leg pie chart data
-df_leg_counts = df_leg['Exercise'].value_counts().reset_index()
-df_leg_counts.columns = ['Exercise', 'Count']
-
-leg_bar = px.bar(
-    df_leg_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Leg Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-leg_pie = px.pie(
-    df_leg_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Leg Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Bicep Exercises =========================== #
-
-# Filter for Bicep category and reset index
-df_bicep = df_long[df_long['Category'] == 'Bicep'].reset_index(drop=True)
-
-bicep_line = make_line_chart(df_bicep, 'Bicep Progress Over Time')
-
-# Create bicep pie chart data
-df_bicep_counts = df_bicep['Exercise'].value_counts().reset_index()
-df_bicep_counts.columns = ['Exercise', 'Count']
-
-bicep_bar = px.bar(
-    df_bicep_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Bicep Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-bicep_pie = px.pie(
-    df_bicep_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Bicep Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Tricep Exercises =========================== #
-
-# Filter for Tricep category and reset index
-df_tricep = df_long[df_long['Category'] == 'Tricep'].reset_index(drop=True)
-
-tricep_line = make_line_chart(df_tricep, 'Tricep Progress Over Time')
-
-# Create tricep pie chart data
-df_tricep_counts = df_tricep['Exercise'].value_counts().reset_index()
-df_tricep_counts.columns = ['Exercise', 'Count']
-
-tricep_bar = px.bar(
-    df_tricep_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Tricep Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-tricep_pie = px.pie(
-    df_tricep_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Tricep Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Shoulder Exercises =========================== #
-
-# Filter for Shoulder category and reset index
-df_shoulder = df_long[df_long['Category'] == 'Shoulder'].reset_index(drop=True)
-
-shoulder_line = make_line_chart(df_shoulder, 'Shoulder Progress Over Time')
-
-# Create shoulder pie chart data
-df_shoulder_counts = df_shoulder['Exercise'].value_counts().reset_index()
-df_shoulder_counts.columns = ['Exercise', 'Count']
-
-shoulder_bar = px.bar(
-    df_shoulder_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Shoulder Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-shoulder_pie = px.pie(
-    df_shoulder_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Shoulder Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Forearm Exercises =========================== #
-
-# Filter for Forearm category and reset index
-df_forearm = df_long[df_long['Category'] == 'Forearm'].reset_index(drop=True)
-
-forearm_line = make_line_chart(df_forearm, 'Forearm Progress Over Time')
-
-# Create forearm pie chart data
-df_forearm_counts = df_forearm['Exercise'].value_counts().reset_index()
-df_forearm_counts.columns = ['Exercise', 'Count']
-
-forearm_bar = px.bar(
-    df_forearm_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Forearm Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-forearm_pie = px.pie(
-    df_forearm_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Forearm Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Ab Exercises =========================== #
-
-# Filter for Ab category and reset index
-df_ab = df_long[df_long['Category'] == 'Ab'].reset_index(drop=True)
-
-ab_line = make_line_chart(df_ab, 'Ab Progress Over Time')
-
-# Create ab pie chart data
-df_ab_counts = df_ab['Exercise'].value_counts().reset_index()
-df_ab_counts.columns = ['Exercise', 'Count']
-
-ab_bar = px.bar(
-    df_ab_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Ab Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-ab_pie = px.pie(
-    df_ab_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Ab Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Calisthenics Exercises =========================== #
-
-# Filter for Calisthenics category and reset index
-df_calisthenics = df_long[df_long['Category'] == 'Calisthenics'].reset_index(drop=True)
-
-calisthenics_line = make_line_chart(df_calisthenics, 'Calisthenics Progress Over Time')
-
-# Create calisthenics pie chart data
-df_calisthenics_counts = df_calisthenics['Exercise'].value_counts().reset_index()
-df_calisthenics_counts.columns = ['Exercise', 'Count']
-
-calisthenics_bar = px.bar(
-    df_calisthenics_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Calisthenics Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-calisthenics_pie = px.pie(
-    df_calisthenics_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Calisthenics Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
-
-# ========================= Cardio Exercises =========================== #
-
-# Filter for Cardio category and reset index
-df_cardio = df_long[df_long['Category'] == 'Cardio'].reset_index(drop=True)
-
-cardio_line = make_line_chart(df_cardio, 'Cardio Progress Over Time')
-
-# Create cardio pie chart data
-df_cardio_counts = df_cardio['Exercise'].value_counts().reset_index()
-df_cardio_counts.columns = ['Exercise', 'Count']
-
-cardio_bar = px.bar(
-    df_cardio_counts,
-    y="Exercise",
-    x='Count',
-    color="Exercise",
-    text='Count',
-    orientation='h'
-).update_layout(
-    title=dict(
-        text=f'Cardio Exercise Bar Chart - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-            )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    ),
-    yaxis=dict(
-        tickfont=dict(size=16),  
-        title=dict(
-            text="Exercise",
-            font=dict(size=16),  
-        ),
-    ),
-    xaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=16),  
-        ),
-    ),
-    legend=dict(
-        title='Exercise',
-        orientation="v",
-        x=1.05,
-        y=1,
-        xanchor="left",
-        yanchor="top",
-        visible=False,
-    ),
-    hovermode='closest',
-    bargap=0.08,
-    bargroupgap=0,
-).update_traces(
-    textposition='auto',
-    hovertemplate='<b>Exercise:</b> %{label}<br><b>Count</b>: %{x}<extra></extra>'
-)
-
-cardio_pie = px.pie(
-    df_cardio_counts,
-    names="Exercise",
-    values='Count'
-).update_layout(
-    title=dict(
-        text=f'Cardio Exercise Distribution - {report_year}',
-        x=0.5, 
-        font=dict(
-            size=21,
-            family='Calibri',
-            color='black',
-        )
-    ),
-    font=dict(
-        family='Calibri',
-        size=16,
-        color='black'
-    )
-).update_traces(
-    rotation=100,
-    texttemplate='%{percent:.1%}',
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
-)
+# Create empty figures for initial load
+empty_fig = go.Figure()
+empty_fig.update_layout(title=dict(text='Please Select a Year', x=0.5, font=dict(size=20)))
 
 # ========================== DataFrame Table ========================== #
 
 # create a display index column and prepare table data/columns
-# reset index to ensure contiguous numbering after any filtering/sorting upstream
 df_indexed = df_long.reset_index(drop=True).copy()
 
 # Reorder columns: Date first, then the rest
@@ -1156,7 +257,7 @@ app.layout = html.Div(
             className='divv', 
             children=[ 
                 html.H1(
-                    f"Jason Fitness Tracker",  
+                    f"{name} Fitness Tracker",  
                     className='title'),
                 html.H1(
                     id='year-subtitle',
@@ -1170,9 +271,13 @@ app.layout = html.Div(
                             id='year-dropdown',
                             options=[
                                 {'label': 'All Time', 'value': 'All Time'},
+                                {'label': '2024', 'value': '2024'},
+                                {'label': '2025', 'value': '2025'},
                                 {'label': '2026', 'value': '2026'},
                             ],
-                            value='All Time',
+                            # value='All Time',
+                            value=None,
+                            placeholder='Select Year',  # Add this line
                             clearable=False,
                             style={
                                 'width': '150px',
@@ -1190,7 +295,7 @@ app.layout = html.Div(
                     children=[
                         html.A(
                             'Repo',
-                            href=f'https://github.com/CxLos/Jason_Fitness_Tracker',
+                            href=f'https://github.com/CxLos/{name}_Fitness_Tracker',
                             className='btn'
                         ),
                     ]
@@ -1213,7 +318,7 @@ html.Div(
                         html.H3(
                             id='total-exercises-title',
                             className='rollup-title',
-                            children=[f'Total Gym Days All Time']
+                            children=[f'Total Gym Days']
                         ),
                     ]
                 ),
@@ -1268,210 +373,6 @@ html.Div(
     ]
 ),
 
-# html.Div(
-#     className='rollup-row',
-#     children=[
-        
-#         html.Div(
-#             className='rollup-box-tl',
-#             children=[
-#                 html.Div(
-#                     className='title-box',
-#                     children=[
-#                         html.H3(
-#                             id='pull-days-title',
-#                             className='rollup-title',
-#                             children=[f'Total Pull Days All Time']
-#                         ),
-#                     ]
-#                 ),
-
-#                 html.Div(
-#                     className='circle-box',
-#                     children=[
-#                         html.Div(
-#                             className='circle-1',
-#                             children=[
-#                                 html.H1(
-#                                     id='pull-days',
-#                                 className='rollup-number',
-#                                 children=['-']
-#                             ),
-#                             ]
-#                         )
-#                     ],
-#                 ),
-#             ]
-#         ),
-#         html.Div(
-#             className='rollup-box-tr',
-#             children=[
-#                 html.Div(
-#                     className='title-box',
-#                     children=[
-#                         html.H3(
-#                             id='leg-days-title',
-#                             className='rollup-title',
-#                             children=['Total Leg Days All Time']
-#                         ),
-#                     ]
-#                 ),
-#                 html.Div(
-#                     className='circle-box',
-#                     children=[
-#                         html.Div(
-#                             className='circle-2',
-#                             children=[
-#                                 html.H1(
-#                                 id='leg-days',
-#                                 className='rollup-number',
-#                                 children=['-']
-#                             ),
-#                             ]
-#                         )
-#                     ],
-#                 ),
-#             ]
-#         ),
-#     ]
-# ),
-
-# html.Div(
-#     className='rollup-row',
-#     children=[
-        
-#         html.Div(
-#             className='rollup-box-tl',
-#             children=[
-#                 html.Div(
-#                     className='title-box',
-#                     children=[
-#                         html.H3(
-#                             id='arm-days-title',
-#                             className='rollup-title',
-#                             children=[f'Total Arm Days All Time']
-#                         ),
-#                     ]
-#                 ),
-
-#                 html.Div(
-#                     className='circle-box',
-#                     children=[
-#                         html.Div(
-#                             className='circle-1',
-#                             children=[
-#                                 html.H1(
-#                                     id='arm-days',
-#                                 className='rollup-number',
-#                                 children=['-']
-#                             ),
-#                             ]
-#                         )
-#                     ],
-#                 ),
-#             ]
-#         ),
-#         html.Div(
-#             className='rollup-box-tr',
-#             children=[
-#                 html.Div(
-#                     className='title-box',
-#                     children=[
-#                         html.H3(
-#                             id='ab-days-title',
-#                             className='rollup-title',
-#                             children=['Total Ab Days All Time']
-#                         ),
-#                     ]
-#                 ),
-#                 html.Div(
-#                     className='circle-box',
-#                     children=[
-#                         html.Div(
-#                             className='circle-2',
-#                             children=[
-#                                 html.H1(
-#                                 id='ab-days',
-#                                 className='rollup-number',
-#                                 children=['-']
-#                             ),
-#                             ]
-#                         )
-#                     ],
-#                 ),
-#             ]
-#         ),
-#     ]
-# ),
-
-# html.Div(
-#     className='rollup-row',
-#     children=[
-        
-#         html.Div(
-#             className='rollup-box-tl',
-#             children=[
-#                 html.Div(
-#                     className='title-box',
-#                     children=[
-#                         html.H3(
-#                             id='other-days-title',
-#                             className='rollup-title',
-#                             children=[f'Total Other Workouts All Time']
-#                         ),
-#                     ]
-#                 ),
-
-#                 html.Div(
-#                     className='circle-box',
-#                     children=[
-#                         html.Div(
-#                             className='circle-1',
-#                             children=[
-#                                 html.H1(
-#                                     id='other-days',
-#                                 className='rollup-number',
-#                                 children=['-']
-#                             ),
-#                             ]
-#                         )
-#                     ],
-#                 ),
-#             ]
-#         ),
-#         html.Div(
-#             className='rollup-box-tr',
-#             children=[
-#                 html.Div(
-#                     className='title-box',
-#                     children=[
-#                         html.H3(
-#                             id='-days-title',
-#                             className='rollup-title',
-#                             children=['Placeholder']
-#                         ),
-#                     ]
-#                 ),
-#                 html.Div(
-#                     className='circle-box',
-#                     children=[
-#                         html.Div(
-#                             className='circle-2',
-#                             children=[
-#                                 html.H1(
-#                                 id='-days',
-#                                 className='rollup-number',
-#                                 children=['-']
-#                             ),
-#                             ]
-#                         )
-#                     ],
-#                 ),
-#             ]
-#         ),
-#     ]
-# ),
-
 # ============================ Visuals ========================== #
 
 html.Div(
@@ -1495,7 +396,7 @@ html.Div(
                                 html.H3(
                                     id='push-days-title',
                                     className='rollup-title',
-                                    children=['Total Push Days All Time']
+                                    children=['Total Push Days']
                                 ),
                             ]
                         ),
@@ -1522,7 +423,7 @@ html.Div(
                         dcc.Graph(
                             id='push-graph',
                             className='wide-graph',
-                            figure=push_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1535,7 +436,7 @@ html.Div(
                                 dcc.Graph(
                                     id='push-bar',
                                     className='graph',
-                                    figure=push_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1545,7 +446,7 @@ html.Div(
                                 dcc.Graph(
                                     id='push-pie',
                                     className='graph',
-                                    figure=push_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1566,7 +467,7 @@ html.Div(
                                 html.H3(
                                     id='pull-days-title',
                                     className='rollup-title',
-                                    children=[f'Total Pull Days All Time']
+                                    children=[f'Total Pull Days']
                                 ),
                             ]
                         ),
@@ -1594,7 +495,7 @@ html.Div(
                         dcc.Graph(
                             id='pull-graph',
                             className='wide-graph',
-                            figure=pull_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1607,7 +508,7 @@ html.Div(
                                 dcc.Graph(
                                     id='pull-bar',
                                     className='graph',
-                                    figure=pull_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1617,7 +518,7 @@ html.Div(
                                 dcc.Graph(
                                     id='pull-pie',
                                     className='graph',
-                                    figure=pull_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1638,7 +539,7 @@ html.Div(
                                 html.H3(
                                     id='leg-days-title',
                                     className='rollup-title',
-                                    children=['Total Leg Days All Time']
+                                    children=['Total Leg Days']
                                 ),
                             ]
                         ),
@@ -1665,7 +566,7 @@ html.Div(
                         dcc.Graph(
                             id='leg-graph',
                             className='wide-graph',
-                            figure=leg_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1678,7 +579,7 @@ html.Div(
                                 dcc.Graph(
                                     id='leg-bar',
                                     className='graph',
-                                    figure=leg_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1688,7 +589,7 @@ html.Div(
                                 dcc.Graph(
                                     id='leg-pie',
                                     className='graph',
-                                    figure=leg_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1709,7 +610,7 @@ html.Div(
                                 html.H3(
                                     id='bicep-days-title',
                                     className='rollup-title',
-                                    children=['Total Bicep Days All Time']
+                                    children=['Total Bicep Days']
                                 ),
                             ]
                         ),
@@ -1736,7 +637,7 @@ html.Div(
                         dcc.Graph(
                             id='bicep-graph',
                             className='wide-graph',
-                            figure=bicep_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1749,7 +650,7 @@ html.Div(
                                 dcc.Graph(
                                     id='bicep-bar',
                                     className='graph',
-                                    figure=bicep_bar
+                                    figure=empty_fig    
                                 )
                             ]
                         ),
@@ -1759,7 +660,7 @@ html.Div(
                                 dcc.Graph(
                                     id='bicep-pie',
                                     className='graph',
-                                    figure=bicep_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1780,7 +681,7 @@ html.Div(
                                 html.H3(
                                     id='tricep-days-title',
                                     className='rollup-title',
-                                    children=['Total Tricep Days All Time']
+                                    children=['Total Tricep Days']
                                 ),
                             ]
                         ),
@@ -1807,7 +708,7 @@ html.Div(
                         dcc.Graph(
                             id='tricep-graph',
                             className='wide-graph',
-                            figure=tricep_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1820,7 +721,7 @@ html.Div(
                                 dcc.Graph(
                                     id='tricep-bar',
                                     className='graph',
-                                    figure=tricep_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1830,7 +731,7 @@ html.Div(
                                 dcc.Graph(
                                     id='tricep-pie',
                                     className='graph',
-                                    figure=tricep_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1851,7 +752,7 @@ html.Div(
                                 html.H3(
                                     id='shoulder-days-title',
                                     className='rollup-title',
-                                    children=['Total Shoulder Days All Time']
+                                    children=['Total Shoulder Days']
                                 ),
                             ]
                         ),
@@ -1878,7 +779,7 @@ html.Div(
                         dcc.Graph(
                             id='shoulder-graph',
                             className='wide-graph',
-                            figure=shoulder_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1891,7 +792,7 @@ html.Div(
                                 dcc.Graph(
                                     id='shoulder-bar',
                                     className='graph',
-                                    figure=shoulder_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1901,7 +802,7 @@ html.Div(
                                 dcc.Graph(
                                     id='shoulder-pie',
                                     className='graph',
-                                    figure=shoulder_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1923,7 +824,7 @@ html.Div(
                                 html.H3(
                                     id='calisthenics-days-title',
                                     className='rollup-title',
-                                    children=['Total Calisthenics Days All Time']
+                                    children=['Total Calisthenics Days']
                                 ),
                             ]
                         ),
@@ -1950,7 +851,7 @@ html.Div(
                         dcc.Graph(
                             id='calisthenics-graph',
                             className='wide-graph',
-                            figure=calisthenics_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -1963,7 +864,7 @@ html.Div(
                                 dcc.Graph(
                                     id='calisthenics-bar',
                                     className='graph',
-                                    figure=calisthenics_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1973,7 +874,7 @@ html.Div(
                                 dcc.Graph(
                                     id='calisthenics-pie',
                                     className='graph',
-                                    figure=calisthenics_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -1995,7 +896,7 @@ html.Div(
                                 html.H3(
                                     id='ab-days-title',
                                     className='rollup-title',
-                                    children=['Total  Days All Time']
+                                    children=['Total  Days']
                                 ),
                             ]
                         ),
@@ -2022,7 +923,7 @@ html.Div(
                         dcc.Graph(
                             id='ab-graph',
                             className='wide-graph',
-                            figure=ab_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -2035,7 +936,7 @@ html.Div(
                                 dcc.Graph(
                                     id='ab-bar',
                                     className='graph',
-                                    figure=ab_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -2045,7 +946,7 @@ html.Div(
                                 dcc.Graph(
                                     id='ab-pie',
                                     className='graph',
-                                    figure=ab_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -2066,7 +967,7 @@ html.Div(
                                 html.H3(
                                     id='forearm-days-title',
                                     className='rollup-title',
-                                    children=['Total Forearm Days All Time']
+                                    children=['Total Forearm Days']
                                 ),
                             ]
                         ),
@@ -2093,7 +994,7 @@ html.Div(
                         dcc.Graph(
                             id='forearm-graph',
                             className='wide-graph',
-                            figure=forearm_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -2106,7 +1007,7 @@ html.Div(
                                 dcc.Graph(
                                     id='forearm-bar',
                                     className='graph',
-                                    figure=forearm_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -2116,7 +1017,7 @@ html.Div(
                                 dcc.Graph(
                                     id='forearm-pie',
                                     className='graph',
-                                    figure=forearm_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -2137,7 +1038,7 @@ html.Div(
                                 html.H3(
                                     id='cardio-days-title',
                                     className='rollup-title',
-                                    children=['Total Cardio Days All Time']
+                                    children=['Total Cardio Days']
                                 ),
                             ]
                         ),
@@ -2164,7 +1065,7 @@ html.Div(
                         dcc.Graph(
                             id='cardio-graph',
                             className='wide-graph',
-                            figure=cardio_line
+                            figure=empty_fig
                         )
                     ]
                 ),
@@ -2177,7 +1078,7 @@ html.Div(
                                 dcc.Graph(
                                     id='cardio-bar',
                                     className='graph',
-                                    figure=cardio_bar
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -2187,7 +1088,7 @@ html.Div(
                                 dcc.Graph(
                                     id='cardio-pie',
                                     className='graph',
-                                    figure=cardio_pie
+                                    figure=empty_fig
                                 )
                             ]
                         ),
@@ -2230,7 +1131,7 @@ html.Div(
                 style_header={
                     'textAlign': 'center', 
                     'fontWeight': 'bold',
-                    'backgroundColor': '#34A853', 
+                    'backgroundColor': "#FF0000", 
                     'color': 'white'
                 },
                 style_data={
@@ -2317,9 +1218,41 @@ html.Div(
         Output('applications-table', 'data'),
         Output('applications-table', 'columns'),
     ],
-    [Input('year-dropdown', 'value')]
+    [Input('year-dropdown', 'value')],
+    prevent_initial_call=True
+    # prevent_initial_call=False 
 )
 def update_dashboard(selected_year):
+
+    # Handle None (no selection yet) - this is the key fix
+    if selected_year is None:
+        selected_year = 'All Time'
+
+    try:
+        print(f"🔄 Callback triggered for year: {selected_year}")
+        
+        # Load data for selected year
+        df_year = load_data_for_year(selected_year)
+        # print(f"✅ Loaded {len(df_year)} rows for {selected_year}")
+        
+        # ...existing code...
+        
+    except Exception as e:
+        print(f"❌ ERROR in callback: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return empty/error state
+        return (
+            f"Error: {selected_year}",
+            "Error loading data",
+            0,
+            *["Error"] * 20,  # All other text outputs
+            *[empty_fig] * 30,  # All graph outputs
+            "Error loading table",
+            [],
+            []
+        )
 
     # Load data for selected year
     df_year = load_data_for_year(selected_year)
@@ -2368,6 +1301,7 @@ def update_dashboard(selected_year):
     df_push = df_long[df_long['Category'] == 'Push'].reset_index(drop=True)
     push_days = df_push['Date'].nunique() if not df_push.empty else 0
     push_fig = make_line_chart(df_push, f'Push Progress Over Time - {selected_year}')
+
     df_push_counts = df_push['Exercise'].value_counts().reset_index()
     df_push_counts.columns = ['Exercise', 'Count']
 
@@ -2377,7 +1311,8 @@ def update_dashboard(selected_year):
         x='Count', 
         color="Exercise", 
         text='Count', 
-        orientation='h'
+        orientation='h',
+        # color_discrete_sequence=px.colors.qualitative.Vivid
     ).update_layout(
         title=dict(
             text=f'Push Exercise Bar Chart - {selected_year}', 
@@ -2435,14 +1370,16 @@ def update_dashboard(selected_year):
     ).update_traces(
         rotation=100, 
         texttemplate='%{percent:.1%}', 
-        hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
+        hovertemplate='<b>Exercise:</b> %{y}<br><b>Count</b>: %{x}<extra></extra>' 
     )
     
     df_pull = df_long[df_long['Category'] == 'Pull'].reset_index(drop=True)
     pull_days = df_pull['Date'].nunique() if not df_pull.empty else 0
     pull_fig = make_line_chart(df_pull, f'Pull Progress Over Time - {selected_year}')
+
     df_pull_counts = df_pull['Exercise'].value_counts().reset_index()
     df_pull_counts.columns = ['Exercise', 'Count']
+
     pull_bar_fig = px.bar(
         df_pull_counts, 
         y="Exercise", 
@@ -2515,8 +1452,10 @@ def update_dashboard(selected_year):
     df_leg = df_long[df_long['Category'] == 'Leg'].reset_index(drop=True)
     leg_days = df_leg['Date'].nunique() if not df_leg.empty else 0
     leg_fig = make_line_chart(df_leg, f'Leg Progress Over Time - {selected_year}')
+
     df_leg_counts = df_leg['Exercise'].value_counts().reset_index()
     df_leg_counts.columns = ['Exercise', 'Count']
+
     leg_bar_fig = px.bar(
         df_leg_counts, 
         y="Exercise", 
@@ -2590,8 +1529,10 @@ def update_dashboard(selected_year):
     df_bicep = df_long[df_long['Category'] == 'Bicep'].reset_index(drop=True)
     bicep_days = df_bicep['Date'].nunique() if not df_bicep.empty else 0
     bicep_fig = make_line_chart(df_bicep, f'Bicep Progress Over Time - {selected_year}')
+
     df_bicep_counts = df_bicep['Exercise'].value_counts().reset_index()
     df_bicep_counts.columns = ['Exercise', 'Count']
+    
     bicep_bar_fig = px.bar(
         df_bicep_counts, 
         y="Exercise", 
@@ -2664,8 +1605,10 @@ def update_dashboard(selected_year):
     df_tricep = df_long[df_long['Category'] == 'Tricep'].reset_index(drop=True)
     tricep_days = df_tricep['Date'].nunique() if not df_tricep.empty else 0
     tricep_fig = make_line_chart(df_tricep, f'Tricep Progress Over Time - {selected_year}')
+
     df_tricep_counts = df_tricep['Exercise'].value_counts().reset_index()
     df_tricep_counts.columns = ['Exercise', 'Count']
+
     tricep_bar_fig = px.bar(
         df_tricep_counts, 
         y="Exercise", 
@@ -2738,8 +1681,10 @@ def update_dashboard(selected_year):
     df_shoulder = df_long[df_long['Category'] == 'Shoulder'].reset_index(drop=True)
     shoulder_days = df_shoulder['Date'].nunique() if not df_shoulder.empty else 0
     shoulder_fig = make_line_chart(df_shoulder, f'Shoulder Progress Over Time - {selected_year}')
+
     df_shoulder_counts = df_shoulder['Exercise'].value_counts().reset_index()
     df_shoulder_counts.columns = ['Exercise', 'Count']
+
     shoulder_bar_fig = px.bar(
         df_shoulder_counts, 
         y="Exercise", 
@@ -2812,8 +1757,10 @@ def update_dashboard(selected_year):
     df_ab = df_long[df_long['Category'] == 'Ab'].reset_index(drop=True)
     ab_days = df_ab['Date'].nunique() if not df_ab.empty else 0
     ab_fig = make_line_chart(df_ab, f'Ab Progress Over Time - {selected_year}')
+
     df_ab_counts = df_ab['Exercise'].value_counts().reset_index()
     df_ab_counts.columns = ['Exercise', 'Count']
+
     ab_bar_fig = px.bar(
         df_ab_counts, 
         y="Exercise", 
@@ -2886,8 +1833,10 @@ def update_dashboard(selected_year):
     df_calisthenics = df_long[df_long['Category'] == 'Calisthenics'].reset_index(drop=True)
     calisthenics_days = df_calisthenics['Date'].nunique() if not df_calisthenics.empty else 0
     calisthenics_fig = make_line_chart(df_calisthenics, f'Calisthenics Progress Over Time - {selected_year}')
+
     df_calisthenics_counts = df_calisthenics['Exercise'].value_counts().reset_index()
     df_calisthenics_counts.columns = ['Exercise', 'Count']
+
     calisthenics_bar_fig = px.bar(
         df_calisthenics_counts, 
         y="Exercise", 
@@ -2960,8 +1909,10 @@ def update_dashboard(selected_year):
     df_forearm = df_long[df_long['Category'] == 'Forearm'].reset_index(drop=True)
     forearm_days = df_forearm['Date'].nunique() if not df_forearm.empty else 0
     forearm_fig = make_line_chart(df_forearm, f'Forearm Progress Over Time - {selected_year}')
+
     df_forearm_counts = df_forearm['Exercise'].value_counts().reset_index()
     df_forearm_counts.columns = ['Exercise', 'Count']
+
     forearm_bar_fig = px.bar(
         df_forearm_counts, 
         y="Exercise", 
@@ -3034,8 +1985,10 @@ def update_dashboard(selected_year):
     df_cardio = df_long[df_long['Category'] == 'Cardio'].reset_index(drop=True)
     cardio_days = df_cardio['Date'].nunique() if not df_cardio.empty else 0
     cardio_fig = make_line_chart(df_cardio, f'Cardio Progress Over Time - {selected_year}')
+
     df_cardio_counts = df_cardio['Exercise'].value_counts().reset_index()
     df_cardio_counts.columns = ['Exercise', 'Count']
+
     cardio_bar_fig = px.bar(
         df_cardio_counts, 
         y="Exercise", 
@@ -3197,7 +2150,6 @@ if __name__ == '__main__':
 
 # updated_path = f'data/{name}_fitness_tracker_cleaned.xlsx'
 # data_path = os.path.join(script_dir, updated_path)
-# # sheet_name=f'{report_month} {report_year}'
 
 # # Create Excel writer object
 # with pd.ExcelWriter(data_path, engine='openpyxl') as writer:
@@ -3222,7 +2174,7 @@ if __name__ == '__main__':
 #                 id_vars=['Category', 'Exercise'],
 #                 value_vars=date_columns,
 #                 var_name='Date',
-#                 value_name='Weight'
+#                 value_name='Weight' 
 #             )
             
 #             # Clean the data
@@ -3242,13 +2194,13 @@ if __name__ == '__main__':
 
 # print(f"Saved all data to {data_path}")
 
-# -------------------------------------------- KILL PORT ---------------------------------------------------
+# ----------------------------------------- KILL PORT ----------------------------------------
 
 # netstat -ano | findstr :8050
 # taskkill /PID 24772 /F
 # npx kill-port 8050
 
-# ---------------------------------------------- Host Application -------------------------------------------
+# ---------------------------------------- Host Application -----------------------------
 
 # 1. pip freeze > requirements.txt
 # 2. add this to procfile: 'web: gunicorn impact_11_2024:server'
