@@ -39,16 +39,19 @@ To run this project locally, follow these steps:
 - To launch the dashboard, execute the following command in your terminal:
 
 ```bash
-python fitness_tracker.py
+python app.py
 ```
 
 The dashboard will be available at `http://127.0.0.1:8050/`
 
+## 🌐 Live Demo
+
+**[View Live Dashboard](https://jason-fitness-tracker.onrender.com/)**
 ![Preview](./screenshots/image.png)
 
 ## 🧪 Methodology
 
-The data for this project is sourced directly from a Google Sheet where I log my personal fitness workouts. Each exercise is categorized by muscle group (Push, Pull, Leg, Bicep, Tricep, Shoulder, Forearm, Ab, and Calisthenics), with dates as columns and weight lifted as values.
+The data for this project is sourced directly from a Google Sheet where Jason logs personal fitness workouts. Each exercise is categorized by muscle group (Push, Pull, Leg, Bicep, Tricep, Shoulder, Forearm, Ab, and Calisthenics), with dates as columns and weight lifted as values.
 
 The application uses:
 - **Google Sheets API** via `gspread` for real-time data retrieval
