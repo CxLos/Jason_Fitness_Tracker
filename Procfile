@@ -1,1 +1,1 @@
-web: gunicorn app:server
+web: gunicorn jason_fitness_tracker:server
